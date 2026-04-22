@@ -1487,10 +1487,10 @@ export class Log extends UI {
 export class Layout {
     static root : Grid;
 
-    static initLayout(root : Grid){
+    static initLayout(root : Grid, parentElement : HTMLElement = document.body){
         Layout.root = root;
 
-        document.body.append(root.div);
+        parentElement.append(root.div);
         Layout.root.updateRootLayout();
     
         window.addEventListener("resize", (ev : UIEvent)=>{
