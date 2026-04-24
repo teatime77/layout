@@ -643,7 +643,7 @@ export class Img extends UI {
         else{
 
             this.img.src = this.imgUrl;
-            msg(`img url 1:${this.img.src}`);
+            // msg(`img url 1:${this.img.src}`);
         }
 
         if(data.click != undefined){
@@ -693,7 +693,7 @@ abstract class AbstractButton extends UI {
         if(data.url != undefined){
             this.img = document.createElement("img");
             this.img.src = data.url;
-            msg(`img url 3:${this.img.src}`);
+            // msg(`img url 3:${this.img.src}`);
     
             this.img.style.width   = "100%";
             this.img.style.height  = "100%";
