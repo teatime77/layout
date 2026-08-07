@@ -1,4 +1,4 @@
-import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div } from "@i18n";
+import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI } from "@i18n";
 import { renderKatexSub } from "@parser";
 import { setImgFile } from "./layout_util";
 
@@ -47,7 +47,7 @@ enum Orientation {
     vertical,
 }
 
-export interface Attr {
+export interface Attr extends AbstractUIAttr {
     id? : string;
     className? : string;
     parent? : Block;
@@ -65,14 +65,13 @@ export interface Attr {
     horizontalAlign? : string;
     textAlign? : string;
     fontSize? : string;
-    colspan? : number;
     width? : string;
     height? : string;
     disabled? : boolean;
     visibility? : string;
 }
 
-export abstract class UI {
+export abstract class UI extends AbstractUI {
     static count : number = 0;
 
     idx : number;
@@ -96,15 +95,23 @@ export abstract class UI {
     width? : string;
     height? : string;
     visibility? : string;
-    colspan : number = 1;
 
-    minSize : Vec2 | undefined;
     widthPix  : number = NaN;
     heightPix : number = NaN;
 
     constructor(data : Attr){   
+        super();
+        this.minSize = Vec2.fromXY(NaN, NaN);
         Object.assign(this, data);
         this.idx = ++UI.count;
+    }
+
+    getPosition() : Vec2 {
+        throw new MyError();
+    }
+
+    setPosition(position : Vec2) : void {
+        throw new MyError();
     }
 
     setStyle() : UI {
@@ -192,7 +199,7 @@ export abstract class UI {
     }
 
     getMinSize() : Vec2 {
-        if(this.minSize != undefined){
+        if(! this.minSize.isNaN()){
             return this.minSize;
         }
 
@@ -228,6 +235,7 @@ export abstract class UI {
         }
 
         this.minSize = new Vec2(width, height);
+        assert(! this.minSize.isNaN());
         return this.minSize;
     }
 
@@ -279,7 +287,7 @@ export abstract class UI {
 
         const borderWidthPadding = this.borderWidthPadding();
 
-        if(this.minSize == undefined){
+        if(this.minSize.isNaN()){
             throw new MyError();
         }
 
@@ -951,6 +959,7 @@ export class Flex extends Block {
         }   
 
         this.minSize = new Vec2(width + 2 * Flex.padding, height + 2 * Flex.padding);
+        assert(! this.minSize.isNaN());
 
         return this.minSize;
     }
@@ -965,7 +974,7 @@ export class Flex extends Block {
             for(const [idx, child] of this.children.entries()){
                 child.layout(child_x, child_y, child.getMinSize(), nest + 1);
 
-                child_x += child.minSize!.x + Flex.padding;
+                child_x += child.minSize.x + Flex.padding;
             }
         }
         else if(this.direction == "column"){
@@ -973,7 +982,7 @@ export class Flex extends Block {
             for(const [idx, child] of this.children.entries()){
                 child.layout(child_x, child_y, child.getMinSize(), nest + 1);
 
-                child_y += child.minSize!.y + Flex.padding;
+                child_y += child.minSize.y + Flex.padding;
             }
         }
         else{
@@ -1022,7 +1031,7 @@ export class PopupMenu extends UI {
 
     show(ev : MouseEvent){
         setTimeout(()=>{
-            this.flex.getAllUI().forEach(x => x.minSize = undefined);
+            this.flex.getAllUI().forEach(x => x.minSize = Vec2.fromXY(NaN, NaN));
 
             const size = this.flex.getMinSize();
             this.flex.layout(0, 0, size, 0);
@@ -1171,6 +1180,7 @@ export class Grid extends Block {
         }
 
         this.minSize = new Vec2(width, height);
+        assert(! this.minSize.isNaN());
         return this.minSize;
     }
 
@@ -1228,19 +1238,15 @@ export class Grid extends Block {
         let child_y = 0;
         for(const child of this.children){
             let child_width : number;
-            if(child.colspan == 1){
-                child_width = widths[col_idx];
-            }
-            else{
-                child_width = sum(widths.slice(col_idx, col_idx + child.colspan))
-            }
+            assert(child.getColSpan() == 1);
+            child_width = widths[col_idx];
 
             child.layout(child_x, child_y, new Vec2(child_width, this.heights[row]), nest + 1 );
 
-            if(col_idx + child.colspan < widths.length){
+            if(col_idx + child.getColSpan() < widths.length){
 
                 child_x += widths[col_idx];
-                col_idx += child.colspan;
+                col_idx += child.getColSpan();
             }
             else{
                 child_x   = 0;
@@ -1254,7 +1260,7 @@ export class Grid extends Block {
 
 
     updateRootLayout(){
-        this.getAllUI().forEach(x => x.minSize = undefined);
+        this.getAllUI().forEach(x => x.minSize = Vec2.fromXY(NaN, NaN));
         const size = this.getMinSize();
 
         let x : number;
