@@ -59,8 +59,6 @@ export interface Attr extends AbstractUIAttr {
     backgroundColor? : string;
     borderStyle? : string;
     borderWidth? : number;
-    padding? : number;
-    paddingLeft? : string;
     verticalAlign? : string;
     horizontalAlign? : string;
     textAlign? : string;
@@ -86,8 +84,6 @@ export abstract class UI extends AbstractUI {
     backgroundColor? : string;
     borderStyle? : string;
     borderWidth? : number;
-    padding? : number;
-    paddingLeft? : string;
     verticalAlign? : string;
     horizontalAlign? : string;
     textAlign? : string;
@@ -102,7 +98,13 @@ export abstract class UI extends AbstractUI {
     constructor(data : Attr){   
         super();
         this.minSize = Vec2.fromXY(NaN, NaN);
+
+        if(data.padding == undefined && (this instanceof InputText || this instanceof InputNumberRange)){
+            data.padding = inputPadding;
+        }
+
         Object.assign(this, data);
+        super.copyFromUIAttr(data);
         this.idx = ++UI.count;
     }
 
@@ -142,10 +144,6 @@ export abstract class UI extends AbstractUI {
 
         if(this.borderStyle != undefined){
             ele.style.borderStyle = this.borderStyle;
-        }
-
-        if(this.padding == undefined && (this instanceof InputText || this instanceof InputNumberRange)){
-            this.padding = inputPadding;
         }
 
         if(this.textAlign != undefined){
@@ -192,7 +190,7 @@ export abstract class UI extends AbstractUI {
         }
 
         if(this.padding != undefined){
-            n += 2 * this.padding;
+            n += this.padding.width();
         }
 
         return n;
