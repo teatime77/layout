@@ -58,7 +58,6 @@ export interface Attr extends AbstractUIAttr {
     color? : string;
     backgroundColor? : string;
     borderStyle? : string;
-    borderWidth? : number;
     verticalAlign? : string;
     horizontalAlign? : string;
     textAlign? : string;
@@ -83,7 +82,6 @@ export abstract class UI extends AbstractUI {
     color? : string;
     backgroundColor? : string;
     borderStyle? : string;
-    borderWidth? : number;
     verticalAlign? : string;
     horizontalAlign? : string;
     textAlign? : string;
