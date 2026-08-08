@@ -310,16 +310,16 @@ export abstract class UI extends AbstractUI {
     selectUI(selected : boolean){
     }
 
-    layout(x : number, y : number, size : Vec2, nest : number){
+    layout(pos : Vec2, size : Vec2, nest : number){
         if(appMode == AppMode.lessonPlay){            
-            msg(`${" ".repeat(4 * nest)} id:${this.constructor.name} x:${x.toFixed()} y:${y.toFixed()} position:${this.position} ${this.html().style.position}`);
+            msg(`${" ".repeat(4 * nest)} id:${this.constructor.name} x:${pos.x.toFixed()} y:${pos.y.toFixed()} position:${this.position} ${this.html().style.position}`);
         }
 
         this.setSize(size);
         if(this.horizontalAlign == "center"){
-            x += 0.5 * (size.x - this.widthPix);
+            pos.x += 0.5 * (size.x - this.widthPix);
         }
-        this.setXY(x, y);
+        this.setXY(pos.x, pos.y);
     }
 
     ratio() : number {
@@ -962,15 +962,15 @@ export class Flex extends Block {
         return this.minSize;
     }
 
-    layout(x : number, y : number, size : Vec2, nest : number){
-        super.layout(x, y, size, nest);
+    layout(pos : Vec2, size : Vec2, nest : number){
+        super.layout(pos, size, nest);
 
         let child_x = Flex.padding;
         let child_y = Flex.padding;
         if(this.direction == "row"){
 
             for(const [idx, child] of this.children.entries()){
-                child.layout(child_x, child_y, child.getMinSize(), nest + 1);
+                child.layout(Vec2.fromXY(child_x, child_y), child.getMinSize(), nest + 1);
 
                 child_x += child.minSize.x + Flex.padding;
             }
@@ -978,7 +978,7 @@ export class Flex extends Block {
         else if(this.direction == "column"){
 
             for(const [idx, child] of this.children.entries()){
-                child.layout(child_x, child_y, child.getMinSize(), nest + 1);
+                child.layout(Vec2.fromXY(child_x, child_y), child.getMinSize(), nest + 1);
 
                 child_y += child.minSize.y + Flex.padding;
             }
@@ -1032,7 +1032,7 @@ export class PopupMenu extends UI {
             this.flex.getAllUI().forEach(x => x.minSize = Vec2.fromXY(NaN, NaN));
 
             const size = this.flex.getMinSize();
-            this.flex.layout(0, 0, size, 0);
+            this.flex.layout(Vec2.zero(), size, 0);
 
             this.dlg.style.width  = `${size.x}px`;
             this.dlg.style.height = `${size.y}px`;
@@ -1182,8 +1182,8 @@ export class Grid extends Block {
         return this.minSize;
     }
 
-    layout(x : number, y : number, size : Vec2, nest : number){
-        super.layout(x, y, size, nest);
+    layout(pos : Vec2, size : Vec2, nest : number){
+        super.layout(pos, size, nest);
 
         let widths = new Array(this.minWidths.length).fill(0);
 
@@ -1239,7 +1239,7 @@ export class Grid extends Block {
             assert(child.getColSpan() == 1);
             child_width = widths[col_idx];
 
-            child.layout(child_x, child_y, new Vec2(child_width, this.heights[row]), nest + 1 );
+            child.layout(Vec2.fromXY(child_x, child_y), new Vec2(child_width, this.heights[row]), nest + 1 );
 
             if(col_idx + child.getColSpan() < widths.length){
 
@@ -1284,7 +1284,7 @@ export class Grid extends Block {
             y = Math.max(0, 0.5 * (window.innerHeight - size.y));
         }
 
-        this.layout(x, y, size, 0);
+        this.layout(Vec2.fromXY(x, y), size, 0);
     }
 }
 
@@ -1359,7 +1359,7 @@ export class Dialog extends UI {
 
     showStyle(pageX : 0, pageY : 0){
         const size = this.content.getMinSize();
-        this.content.layout(0, 0, size, 0);
+        this.content.layout(Vec2.zero(), size, 0);
 
         // msg(`dlg: ${size.x} ${size.y} ${pageX} ${pageY}`);
         this.div.style.width  = `${size.x + 10}px`;
