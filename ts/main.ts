@@ -88,9 +88,6 @@ export abstract class UI extends AbstractUI {
     fontSize? : string;
     visibility? : string;
 
-    widthPix  : number = NaN;
-    heightPix : number = NaN;
-
     constructor(data : Attr){   
         super();
 
@@ -308,21 +305,21 @@ export abstract class UI extends AbstractUI {
         }
 
         if(this.hasFixedSizeX()){
-            this.widthPix  = this.minSize.x;
+            this.netSize.x  = this.minSize.x;
         }
         else{
-            this.widthPix  = size.x - borderWidthPadding;
+            this.netSize.x  = size.x - borderWidthPadding;
         }
 
         if(this.hasFixedSizeY()){
-            this.heightPix = this.minSize.y;
+            this.netSize.y = this.minSize.y;
         }
         else{
-            this.heightPix = size.y - borderWidthPadding;
+            this.netSize.y = size.y - borderWidthPadding;
         }
 
-        html.style.width  = `${this.widthPix}px`;
-        html.style.height = `${this.heightPix}px`;
+        html.style.width  = `${this.netSize.x}px`;
+        html.style.height = `${this.netSize.y}px`;
     }
 
     selectUI(selected : boolean){
@@ -335,7 +332,7 @@ export abstract class UI extends AbstractUI {
 
         this.setSize(size);
         if(this.horizontalAlign == "center"){
-            pos.x += 0.5 * (size.x - this.widthPix);
+            pos.x += 0.5 * (size.x - this.netSize.x);
         }
         this.setXY(pos.x, pos.y);
     }
