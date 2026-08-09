@@ -215,11 +215,7 @@ export abstract class UI extends AbstractUI {
         return n;
     }
 
-    getMinSize() : Vec2 {
-        if(! this.minSize.isNaN()){
-            return this.minSize;
-        }
-
+    setMinSize() : void {        
         let width : number | undefined;
         let height : number | undefined;
 
@@ -253,6 +249,13 @@ export abstract class UI extends AbstractUI {
 
         this.minSize = new Vec2(width, height);
         assert(! this.minSize.isNaN());
+    }
+
+    getMinSize() : Vec2 {
+        if(this.minSize.isNaN()){
+            this.setMinSize();
+        }
+
         return this.minSize;
     }
 
@@ -916,7 +919,7 @@ export class Flex extends Block {
         this.children.forEach(x => this.div.append(x.html()));
     }
 
-    getMinSize() : Vec2 {
+    setMinSize() : void {        
         let min_sizes : Vec2[] = [];
 
         if(this.children.length != 0){
@@ -962,6 +965,10 @@ export class Flex extends Block {
 
         this.minSize = new Vec2(width + 2 * Flex.padding, height + 2 * Flex.padding);
         assert(! this.minSize.isNaN());
+    }
+
+    getMinSize() : Vec2 {
+        this.setMinSize();
 
         return this.minSize;
     }
@@ -1108,7 +1115,7 @@ export class Grid extends Block {
         return heights;
     }
 
-    getMinSize() : Vec2 {
+    setMinSize() : void {        
         let width : number;
 
         this.numCols = (this.columns == undefined ? 1 : this.columns.length);
@@ -1181,6 +1188,10 @@ export class Grid extends Block {
 
         this.minSize = new Vec2(width, height);
         assert(! this.minSize.isNaN());
+    }
+
+    getMinSize() : Vec2 {
+        this.setMinSize();
         return this.minSize;
     }
 
