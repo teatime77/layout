@@ -1,4 +1,4 @@
-import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI } from "@i18n";
+import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI, pixUI } from "@i18n";
 import { renderKatexSub } from "@parser";
 import { setImgFile } from "./layout_util";
 
@@ -86,8 +86,6 @@ export abstract class UI extends AbstractUI {
     horizontalAlign? : string;
     textAlign? : string;
     fontSize? : string;
-    width? : string;
-    height? : string;
     visibility? : string;
 
     widthPix  : number = NaN;
@@ -95,6 +93,21 @@ export abstract class UI extends AbstractUI {
 
     constructor(data : Attr){   
         super();
+
+        if(data.width != undefined || data.height != undefined){
+            this.fixedSize = Vec2.fromXY(NaN, NaN);
+            if(data.width != undefined){
+                this.fixedSize.x = pixUI(data.width);
+                data.width = undefined;
+            }
+            if(data.height != undefined){
+                this.fixedSize.y = pixUI(data.height);
+                data.height = undefined;
+            }
+        }
+
+        assert((data.width ?? "px").endsWith("px"));
+        assert((data.height ?? "px").endsWith("px"));
         this.minSize = Vec2.fromXY(NaN, NaN);
 
         if(data.padding == undefined && (this instanceof InputText || this instanceof InputNumberRange)){
@@ -104,6 +117,14 @@ export abstract class UI extends AbstractUI {
         Object.assign(this, data);
         super.copyFromUIAttr(data);
         this.idx = ++UI.count;
+    }
+
+    hasFixedSizeX() : boolean {
+        return this.fixedSize != undefined && !isNaN(this.fixedSize.x);
+    }
+
+    hasFixedSizeY() : boolean {
+        return this.fixedSize != undefined && !isNaN(this.fixedSize.y);
     }
 
     getPosition() : Vec2 {
@@ -163,12 +184,12 @@ export abstract class UI extends AbstractUI {
             ele.style.backgroundColor = bgColor;
         }
 
-        if(this.width != undefined){
-            ele.style.width = this.width;
+        if(this.hasFixedSizeX()){
+            ele.style.width = `${this.fixedSize!.x}px`;
         }
 
-        if(this.height != undefined){
-            ele.style.height = this.height;
+        if(this.hasFixedSizeY()){
+            ele.style.height = `${this.fixedSize!.y}px`;
         }
 
         if(this.visibility != undefined){
@@ -202,12 +223,12 @@ export abstract class UI extends AbstractUI {
         let width : number | undefined;
         let height : number | undefined;
 
-        if(this.width != undefined && this.width.endsWith("px")){
-            width = pixel(this.width) + this.borderWidthPadding();
+        if(this.hasFixedSizeX()){
+            width = this.fixedSize!.x + this.borderWidthPadding();
         }
 
-        if(this.height != undefined && this.height.endsWith("px")){
-            height = pixel(this.height) + this.borderWidthPadding();
+        if(this.hasFixedSizeY()){
+            height = this.fixedSize!.y + this.borderWidthPadding();
         }
 
         if(width == undefined || height == undefined){
@@ -245,10 +266,8 @@ export abstract class UI extends AbstractUI {
     }
 
     getWidth() : number {
-        if(this.width != undefined){
-            if(this.width.endsWith("px")){
-                return pixel(this.width);
-            }
+        if(this.hasFixedSizeX()){
+            return this.fixedSize!.x;
         }
 
         const rect = this.html().getBoundingClientRect();
@@ -256,10 +275,8 @@ export abstract class UI extends AbstractUI {
     }
 
     getHeight() : number {
-        if(this.height != undefined){
-            if(this.height.endsWith("px")){
-                return pixel(this.height);
-            }
+        if(this.hasFixedSizeY()){
+            return this.fixedSize!.y;
         }
 
         const rect = this.html().getBoundingClientRect();
@@ -287,14 +304,14 @@ export abstract class UI extends AbstractUI {
             throw new MyError();
         }
 
-        if(this.width != undefined){
+        if(this.hasFixedSizeX()){
             this.widthPix  = this.minSize.x;
         }
         else{
             this.widthPix  = size.x - borderWidthPadding;
         }
 
-        if(this.height != undefined){
+        if(this.hasFixedSizeY()){
             this.heightPix = this.minSize.y;
         }
         else{
@@ -318,15 +335,6 @@ export abstract class UI extends AbstractUI {
             pos.x += 0.5 * (size.x - this.widthPix);
         }
         this.setXY(pos.x, pos.y);
-    }
-
-    ratio() : number {
-        if(this.width == undefined || ! this.width.endsWith("%")){
-            throw new MyError();
-        }
-
-        const s = this.width.substring(0, this.width.length - 1);
-        return parseFloat(s);
     }
 }
 
@@ -918,9 +926,8 @@ export class Flex extends Block {
         let width : number | undefined;
         let height : number | undefined;
 
-        if(this.width != undefined){
-            assert(this.width.endsWith("px"));
-            width = pixel(this.width);
+        if(this.hasFixedSizeX()){
+            width = this.fixedSize!.x;
         }
         else{
             if(this.children.length == 0){
@@ -934,9 +941,8 @@ export class Flex extends Block {
             }
         }
 
-        if(this.height != undefined){
-            assert(this.height.endsWith("px"));
-            height = pixel(this.height);
+        if(this.hasFixedSizeY()){
+            height = this.fixedSize!.y;
         }
         else{
             if(this.children.length == 0){
@@ -1109,9 +1115,8 @@ export class Grid extends Block {
         this.numRows = Math.ceil(this.children.length / this.numCols);
         assert(this.rows == undefined || this.rows.length == this.numRows);
 
-        if(this.width != undefined){
-            assert(this.width.endsWith("px"));
-            width = pixel(this.width);
+        if(this.hasFixedSizeX()){
+            width = this.fixedSize!.x;
         }
         else{
 
@@ -1146,10 +1151,9 @@ export class Grid extends Block {
 
         let height : number;
 
-        if(this.height != undefined){
+        if(this.hasFixedSizeY()){
             assert(this.numRows == 1);
-            assert(this.height.endsWith("px"));
-            height = pixel(this.height);
+            height = this.fixedSize!.y;
             this.heights = [ height ];
         }
         else{
