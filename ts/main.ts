@@ -1,4 +1,4 @@
-import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI, pixUI } from "@i18n";
+import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI, pixUI, initGrid, IGrid, setMinSizeGrid, layoutGrid } from "@i18n";
 import { renderKatexSub } from "@parser";
 import { setImgFile } from "./layout_util";
 
@@ -246,6 +246,7 @@ export abstract class UI extends AbstractUI {
 
         this.minSize = new Vec2(width, height);
         assert(! this.minSize.isNaN());
+        this.netSize.copyFrom(this.minSize);
     }
 
     getMinSize() : Vec2 {
@@ -254,33 +255,6 @@ export abstract class UI extends AbstractUI {
         }
 
         return this.minSize;
-    }
-
-    getMinWidth() : number {
-        return this.getMinSize().x;
-    }
-
-
-    getMinHeight() : number {
-        return this.getMinSize().y;
-    }
-
-    getWidth() : number {
-        if(this.hasFixedSizeX()){
-            return this.fixedSize!.x;
-        }
-
-        const rect = this.html().getBoundingClientRect();
-        return rect.width;
-    }
-
-    getHeight() : number {
-        if(this.hasFixedSizeY()){
-            return this.fixedSize!.y;
-        }
-
-        const rect = this.html().getBoundingClientRect();
-        return rect.height;
     }
 
     setXY(x : number, y : number){
@@ -304,22 +278,25 @@ export abstract class UI extends AbstractUI {
             throw new MyError();
         }
 
+        let contentX : number;
+        let contentY : number;
+
         if(this.hasFixedSizeX()){
-            this.netSize.x  = this.minSize.x;
+            contentX  = this.minSize.x;
         }
         else{
-            this.netSize.x  = size.x - borderWidthPadding;
+            contentX  = size.x - borderWidthPadding;
         }
 
         if(this.hasFixedSizeY()){
-            this.netSize.y = this.minSize.y;
+            contentY = this.minSize.y;
         }
         else{
-            this.netSize.y = size.y - borderWidthPadding;
+            contentY = size.y - borderWidthPadding;
         }
 
-        html.style.width  = `${this.netSize.x}px`;
-        html.style.height = `${this.netSize.y}px`;
+        html.style.width  = `${contentX}px`;
+        html.style.height = `${contentY}px`;
     }
 
     selectUI(selected : boolean){
@@ -900,100 +877,93 @@ export class Block extends UI {
     }
 }
 
-export class Flex extends Block {
-    static initialWidth = "300px";
-    static padding = 2;
+function autoToAst(s : string | undefined) : string | undefined {
+    return s == undefined ? s : s.replaceAll("auto", "*");
+}
 
-    direction : string;
+export class Grid extends Block implements IGrid {
+    columns! : string[];
+    rows! : string[];
 
-    constructor(data : Attr & { direction?: string, children : UI[] }){
+    minWidths : number[] = [];
+    heights! : number[];
+
+    numCols : number = NaN;
+    numRows : number = NaN;
+    columnsPix : number[] = [];
+    rowsPix    : number[] = [];
+
+    constructor(data : Attr & { columns?: string, rows? : string, children : UI[] }){        
         super(data);
-        this.div.style.width = Flex.initialWidth;
+        data.columns = autoToAst(data.columns);
+        data.rows    = autoToAst(data.rows);
+        initGrid(this, data.columns, data.rows);
+    }
 
-        this.direction = (data.direction != undefined ? data.direction : "row");
-        this.children = data.children;
-
-        this.children.forEach(x => this.div.append(x.html()));
+    absChildren() : AbstractUI[] {
+        return this.children;
     }
 
     setMinSize() : void {        
-        let min_sizes : Vec2[] = [];
-
-        if(this.children.length != 0){
-            min_sizes = this.children.map(x => x.getMinSize());
-        }
-
-        let width : number | undefined;
-        let height : number | undefined;
-
-        if(this.hasFixedSizeX()){
-            width = this.fixedSize!.x;
-        }
-        else{
-            if(this.children.length == 0){
-                width = 0;
-            }
-            else if(this.direction == "row"){
-                width = sum( min_sizes.map(sz => sz.x) ) + (min_sizes.length - 1) * Flex.padding;
-            }
-            else if(this.direction == "column"){
-                width  = Math.max(...min_sizes.map(sz => sz.x));
-            }
-        }
-
-        if(this.hasFixedSizeY()){
-            height = this.fixedSize!.y;
-        }
-        else{
-            if(this.children.length == 0){
-                height = 0;
-            }
-            else if(this.direction == "row"){
-                height = Math.max(...min_sizes.map(sz => sz.y));
-            }
-            else if(this.direction == "column"){
-                height = sum( min_sizes.map(sz => sz.y) ) + (min_sizes.length - 1) * Flex.padding;
-            }
-        }
-
-        if(width == undefined || height == undefined){
-            throw new MyError();
-        }   
-
-        this.minSize = new Vec2(width + 2 * Flex.padding, height + 2 * Flex.padding);
-        assert(! this.minSize.isNaN());
+        setMinSizeGrid(this);
     }
 
     getMinSize() : Vec2 {
         this.setMinSize();
-
         return this.minSize;
     }
 
     layout(pos : Vec2, size : Vec2, nest : number){
         super.layout(pos, size, nest);
+        layoutGrid(this, pos, size)
+    }
 
-        let child_x = Flex.padding;
-        let child_y = Flex.padding;
-        if(this.direction == "row"){
+    updateRootLayout(){
+        this.getAllUI().forEach(x => x.minSize = Vec2.fromXY(NaN, NaN));
+        const size = this.getMinSize();
 
-            for(const [idx, child] of this.children.entries()){
-                child.layout(Vec2.fromXY(child_x, child_y), child.getMinSize(), nest + 1);
+        let x : number;
+        let y : number;
 
-                child_x += child.minSize.x + Flex.padding;
-            }
-        }
-        else if(this.direction == "column"){
+        if(this.columns != undefined && this.columns.some(x => x.endsWith("%"))){
 
-            for(const [idx, child] of this.children.entries()){
-                child.layout(Vec2.fromXY(child_x, child_y), child.getMinSize(), nest + 1);
-
-                child_y += child.minSize.y + Flex.padding;
-            }
+            size.x = window.innerWidth;
+            x = 0;
         }
         else{
-            throw new MyError();
+
+            x = Math.max(0, 0.5 * (window.innerWidth  - size.x));
         }
+
+        if(this.rows != undefined && this.rows.some(x => x.endsWith("%"))){
+
+            size.y = window.innerHeight;
+            y = 0;
+        }
+        else{
+
+            y = Math.max(0, 0.5 * (window.innerHeight - size.y));
+        }
+
+        this.layout(Vec2.fromXY(x, y), size, 0);
+    }
+}
+
+export class Flex extends Grid {
+    static initialWidth = "300px";
+    static padding = 2;
+
+    constructor(data : Attr & { direction?: string, columns?: string, rows? : string, children : UI[] }){
+        if((data.direction ?? "row") == "row"){
+            data.columns = Array(data.children.length).fill("*").join(" ");
+        }
+        else{
+            data.rows    = Array(data.children.length).fill("*").join(" ");
+        }
+        super(data);
+
+        this.div.style.width = Flex.initialWidth;
+        this.children.forEach(x => this.div.append(x.html()));
     }
 }
 
@@ -1054,247 +1024,6 @@ export class PopupMenu extends UI {
 
     close(){        
         this.dlg.close();
-    }
-}
-
-export class Grid extends Block {
-    columns? : string[];
-    rows? : string[];
-
-    minWidths : number[] = [];
-    heights! : number[];
-
-    numCols : number = NaN;
-    numRows : number = NaN;
-
-    constructor(data : Attr & { columns?: string, rows? : string, children : UI[] }){        
-        super(data);
-        if(data.columns != undefined){
-
-            this.columns = data.columns.split(" ");
-        }
-
-        if(data.rows != undefined){
-
-            this.rows = data.rows.split(" ");
-        }
-    }
-
-    getRow(idx : number) : UI[] {
-        assert(!isNaN(this.numCols) && !isNaN(this.numRows));
-        return this.children.slice(idx * this.numCols, (idx + 1) * this.numCols);
-    }
-
-    getRowHeight(idx : number) : number {
-        return Math.max(... this.getRow(idx).map(ui => ui.getMinHeight()));
-    }
-
-    getColumn(idx : number) : UI[]{
-        assert(!isNaN(this.numCols) && !isNaN(this.numRows));
-        return range(this.children.length).filter(i => i % this.numCols == idx).map(i => this.children[i]);
-    }
-
-    getColumnWith(idx : number) : number {
-        return Math.max(... this.getColumn(idx).map(ui => ui.getMinWidth()));
-    }
-
-    calcHeights(){
-        const heights = range(this.rows!.length).map(x => 0);
-        for(const [idx, row] of this.rows!.entries()){
-            if(row.endsWith("px")){
-                heights[idx] = pixel(row);
-            }
-            else if(row == "auto"){
-                heights[idx] = this.getRowHeight(idx);
-            }
-        }
-
-        return heights;
-    }
-
-    setMinSize() : void {        
-        let width : number;
-
-        this.numCols = (this.columns == undefined ? 1 : this.columns.length);
-        this.numRows = Math.ceil(this.children.length / this.numCols);
-        assert(this.rows == undefined || this.rows.length == this.numRows);
-
-        if(this.hasFixedSizeX()){
-            width = this.fixedSize!.x;
-        }
-        else{
-
-            if(this.columns == undefined){
-
-                width = this.getColumnWith(0);
-            }
-            else{
-                this.minWidths = new Array(this.columns.length).fill(0);
-
-                for(const [idx, col] of this.columns.entries()){
-                    if(col.endsWith("px")){
-                        this.minWidths[idx] = pixel(col);
-                    }
-                    else{
-                        const col_width = Math.max(... this.getColumn(idx).map(ui => ui.getMinWidth()) );
-                        if(col == "auto"){
-                            this.minWidths[idx] = col_width;
-                        }
-                        else if(col.endsWith("%")){
-                            this.minWidths[idx] = col_width / ratio(col);
-                        }
-                        else{
-                            throw new MyError();
-                        }
-                    }
-                }
-
-                width = sum(this.minWidths);
-            }
-        }
-
-        let height : number;
-
-        if(this.hasFixedSizeY()){
-            assert(this.numRows == 1);
-            height = this.fixedSize!.y;
-            this.heights = [ height ];
-        }
-        else{
-
-            if(this.rows == undefined){
-                this.heights = range(this.numRows).map(i => this.getRowHeight(i) );
-                height = sum( this.heights ) ;
-            }
-            else{
-
-                this.heights = this.calcHeights();
-
-                let remaining_height = 0;
-                for(const [idx, size] of this.rows.entries()){
-                    if(size.endsWith("%")){
-
-                        const row_height = Math.max(... this.getRow(idx).map(ui => ui.getMinHeight()) );
-                        remaining_height = Math.max(row_height / ratio(size));
-                    }
-                }
-
-                height = sum(this.heights) + remaining_height;
-            }
-        }
-
-        this.minSize = new Vec2(width, height);
-        assert(! this.minSize.isNaN());
-    }
-
-    getMinSize() : Vec2 {
-        this.setMinSize();
-        return this.minSize;
-    }
-
-    layout(pos : Vec2, size : Vec2, nest : number){
-        super.layout(pos, size, nest);
-
-        let widths = new Array(this.minWidths.length).fill(0);
-
-        if(this.columns == undefined){
-            widths = [ size.x ];
-        }
-        else{
-            let fixed_width = 0;
-            for(const [idx, col] of this.columns.entries()){
-                if(col.endsWith("px") || col == "auto"){
-                    widths[idx]  = this.minWidths[idx];
-                    fixed_width += this.minWidths[idx];
-                }
-            }
-
-            const remaining_width = size.x - fixed_width;
-            for(const [idx, col] of this.columns.entries()){
-                if(col.endsWith("%")){
-                    widths[idx]  = remaining_width * ratio(col);
-                }
-            }
-        }
-
-
-        if(this.rows == undefined){
-            this.heights = range(this.numRows).map(i => this.getRowHeight(i) );
-        }
-        else{
-            if(this.heights == undefined){
-                this.heights = this.calcHeights();
-            }
-            
-            const remaining_height = size.y - sum(this.heights);
-            for(const [idx, row] of this.rows.entries()){
-
-                if(row.endsWith("%")){
-
-                    this.heights[idx] = pixel(row, remaining_height);
-                }
-            }
-        }
-
-        if(appMode == AppMode.lessonPlay){
-            msg(`${" ".repeat(4 * nest)} id:${this.id} widths:${widths.map(x => x.toFixed())} heights:${this.heights.map(x => x.toFixed())}`);
-        }
-
-        let row = 0;
-        let col_idx = 0;
-        let child_x = 0;
-        let child_y = 0;
-        for(const child of this.children){
-            let child_width : number;
-            assert(child.getColSpan() == 1);
-            child_width = widths[col_idx];
-
-            child.layout(Vec2.fromXY(child_x, child_y), new Vec2(child_width, this.heights[row]), nest + 1 );
-
-            if(col_idx + child.getColSpan() < widths.length){
-
-                child_x += widths[col_idx];
-                col_idx += child.getColSpan();
-            }
-            else{
-                child_x   = 0;
-                child_y += this.heights[row];
-
-                col_idx = 0;
-                row++;
-            }
-        }
-    }  
-
-
-    updateRootLayout(){
-        this.getAllUI().forEach(x => x.minSize = Vec2.fromXY(NaN, NaN));
-        const size = this.getMinSize();
-
-        let x : number;
-        let y : number;
-
-        if(this.columns != undefined && this.columns.some(x => x.endsWith("%"))){
-
-            size.x = window.innerWidth;
-            x = 0;
-        }
-        else{
-
-            x = Math.max(0, 0.5 * (window.innerWidth  - size.x));
-        }
-
-        if(this.rows != undefined && this.rows.some(x => x.endsWith("%"))){
-
-            size.y = window.innerHeight;
-            y = 0;
-        }
-        else{
-
-            y = Math.max(0, 0.5 * (window.innerHeight - size.y));
-        }
-
-        this.layout(Vec2.fromXY(x, y), size, 0);
     }
 }
 
