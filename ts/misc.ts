@@ -1,6 +1,7 @@
 import { msg } from "@i18n";
 import { setImgFile } from "./layout_util";
-import { UI, modalDlg, Attr } from "./main";
+import { UI, modalDlg } from "./main";
+import type { Attr } from "./main";
 
 export class ImgDiv extends UI {
     div : HTMLDivElement;

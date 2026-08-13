@@ -1,4 +1,5 @@
-import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUIAttr, AbstractUI, pixUI, initGrid, IGrid, setMinSizeGrid, layoutGrid } from "@i18n";
+import { assert, MyError, Vec2, msg, sum, AppMode, appMode, range, $div, AbstractUI, pixUI, initGrid, setMinSizeGrid, layoutGrid } from "@i18n";
+import type { AbstractUIAttr, IGrid } from "@i18n";
 import { renderKatexSub } from "@parser";
 import { setImgFile } from "./layout_util";
 
