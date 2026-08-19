@@ -80,7 +80,6 @@ export abstract class UI extends AbstractUI {
     name? : string;
     position? : string;
     margin? : string;
-    color? : string;
     backgroundColor? : string;
     borderStyle? : string;
     verticalAlign? : string;
